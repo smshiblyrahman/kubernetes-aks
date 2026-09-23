@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: microservice-alerts
+  namespace: monitoring
+  labels:
+    role: alert-rules
+spec:
+  groups:
+  - name: microservices.rules
+    rules:
+    - alert: HighPodErrorRate
+      expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (app) / sum(rate(http_requests_total[5m])) by (app) > 0.05
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "High 5xx error rate detected for app {{ $labels.app }}"
+        description: "Error rate is above 5% for more than 2 minutes."
+    - alert: PodCrashLooping
+      expr: rate(kube_pod_container_status_restarts_total[5m]) * 60 > 2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod {{ $labels.pod }} restart rate high"
+        description: "Pod is restarting frequently in namespace {{ $labels.namespace }}."
+    - alert: HPAReachMaxReplicas
+      expr: kube_horizontalpodautoscaler_status_current_replicas == kube_horizontalpodautoscaler_spec_max_replicas
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "HPA {{ $labels.horizontalpodautoscaler }} capped at max replicas"
+        description: "Workload has reached maximum scaling limits."
